@@ -17,6 +17,7 @@ FROM unpopular_reservations
 INNER JOIN (
 	SELECT room_number, MAX(check_in_date) as max_date
 	FROM unpopular_reservations
+	WHERE check_in_date <= CURDATE()
 	GROUP BY room_number
 ) max_dates ON max_dates.room_number = unpopular_reservations.room_number AND max_dates.max_date = unpopular_reservations.check_in_date
 INNER JOIN persons ON persons.id = unpopular_reservations.person_id;
@@ -81,4 +82,19 @@ VALUES
 |         999 | Ivan       | Ivanov    |
 |         999 | Petr       | Petrov    |
 +-------------+------------+-----------+
+
+INSERT INTO reservations 
+	(id, person_id, room_number, check_in_date, reserved_at) 
+VALUES 
+	(7, 1, 333, "2025-01-01", "2023-01-01 00:00:00");
+
+Результат запроса на обновленных данных:
++-------------+------------+-----------+
+| room_number | first_name | last_name |
++-------------+------------+-----------+
+|         666 | Petr       | Petrov    |
+|         999 | Ivan       | Ivanov    |
+|         999 | Petr       | Petrov    |
++-------------+------------+-----------+
+(всё верно - последняя запись не должна попасть в выборку, т.к. бронь на 2025 год, а нам нужны те кто "проживал")
 </pre>
