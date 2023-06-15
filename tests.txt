@@ -1,0 +1,67 @@
+Тестирование:
+
+CREATE TABLE persons (
+    id int,
+    first_name varchar(255),
+    last_name varchar(255)
+);
+
+CREATE TABLE reservations (
+    id int,
+    person_id int,
+    room_number int,
+    check_in_date date,
+    reserved_at datetime
+);
+
+INSERT INTO persons
+	(id, first_name, last_name)
+VALUES
+	(1, "Ivan", "Ivanov"),
+	(2, "Petr", "Petrov");
+
+INSERT INTO reservations
+	(id, person_id, room_number, check_in_date, reserved_at)
+VALUES
+	(1, 1, 666, "2020-01-01", "2020-01-01 00:00:00"),
+	(2, 2, 666, "2023-01-01", "2023-01-01 00:00:00"),
+	(3, 1, 777, "2023-01-01", "2023-01-01 00:00:00"),
+	(4, 2, 777, "2023-01-01", "2023-01-01 00:00:00");
+
+Результат запроса на тестовых данных:
++-------------+------------+-----------+
+| room_number | first_name | last_name |
++-------------+------------+-----------+
+|         666 | Petr       | Petrov    |
++-------------+------------+-----------+
+
+
+INSERT INTO reservations
+	(id, person_id, room_number, check_in_date, reserved_at)
+VALUES
+	(5, 1, 999, "2020-01-01", "2020-01-01 00:00:00"),
+	(6, 2, 999, "2020-01-01", "2020-01-01 23:59:59");
+
+Результат запроса на обновленных данных:
++-------------+------------+-----------+
+| room_number | first_name | last_name |
++-------------+------------+-----------+
+|         666 | Petr       | Petrov    |
+|         999 | Ivan       | Ivanov    |
+|         999 | Petr       | Petrov    |
++-------------+------------+-----------+
+
+INSERT INTO reservations
+	(id, person_id, room_number, check_in_date, reserved_at)
+VALUES
+	(7, 1, 333, "2025-01-01", "2023-01-01 00:00:00");
+
+Результат запроса на обновленных данных:
++-------------+------------+-----------+
+| room_number | first_name | last_name |
++-------------+------------+-----------+
+|         666 | Petr       | Petrov    |
+|         999 | Ivan       | Ivanov    |
+|         999 | Petr       | Petrov    |
++-------------+------------+-----------+
+(всё верно - последняя запись не должна попасть в выборку, т.к. бронь на 2025 год, а нам нужны те кто "проживал")

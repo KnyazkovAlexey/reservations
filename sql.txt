@@ -1,0 +1,29 @@
+Запрос (MySQL):
+
+WITH unpopular_reservations AS (
+    SELECT room_number, person_id, check_in_date
+    FROM reservations
+	WHERE room_number NOT IN (
+	  SELECT room_number
+	  FROM reservations
+	  WHERE reserved_at >= (NOW() - INTERVAL 1 YEAR)
+	  GROUP BY room_number
+	  HAVING count(*) >= 2
+	)
+)
+SELECT unpopular_reservations.room_number, persons.first_name, persons.last_name
+FROM unpopular_reservations
+INNER JOIN (
+	SELECT room_number, MAX(check_in_date) as max_date
+	FROM unpopular_reservations
+	WHERE check_in_date <= CURDATE()
+	GROUP BY room_number
+) max_dates ON max_dates.room_number = unpopular_reservations.room_number AND max_dates.max_date = unpopular_reservations.check_in_date
+INNER JOIN persons ON persons.id = unpopular_reservations.person_id;
+
+
+Алгоритм:
+1). Достаю все комнаты, имеющие менее двух бронирований в прошлом году (NOT IN reserved_at >= ...)
+2). Достаю все брони по этим "непопулярным" комнатам (unpopular_reservations)
+3). Нахожу последние брони по каждой комнате (INNER JOIN max_date)
+4). Цепляю имена юзеров (INNER JOIN persons)
