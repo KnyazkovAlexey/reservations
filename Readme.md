@@ -1,100 +1,36 @@
 <pre>
-Запрос (MySQL):
+Дано две таблицы в базе данных: в первой содержится информация о бронированиях
+комнат в отеле(Reservations), во второй - информация о пользователях(Persons).
 
-WITH unpopular_reservations AS (
-    SELECT room_number, person_id, check_in_date
-    FROM reservations
-	WHERE room_number NOT IN (
-	  SELECT room_number
-	  FROM reservations
-	  WHERE reserved_at >= (NOW() - INTERVAL 1 YEAR)
-	  GROUP BY room_number
-	  HAVING count(*) >= 2
-	)
-)
-SELECT unpopular_reservations.room_number, persons.first_name, persons.last_name
-FROM unpopular_reservations
-INNER JOIN (
-	SELECT room_number, MAX(check_in_date) as max_date
-	FROM unpopular_reservations
-	WHERE check_in_date <= CURDATE()
-	GROUP BY room_number
-) max_dates ON max_dates.room_number = unpopular_reservations.room_number AND max_dates.max_date = unpopular_reservations.check_in_date
-INNER JOIN persons ON persons.id = unpopular_reservations.person_id;
+Поля таблицы Reservations:
+● id - идентификатор брони(уникальное значение);
+● room_number - номер комнаты;
+● check_in_date - дата заезда(дата в формате YYYY-MM-DD);
+● check_out_date - дата выезда(дата в формате YYYY-MM-DD);
+● person_id - идентификатор пользователя(ссылается на пользователя из таблицы
+Persons), забронировавшего комнату(т.е. бронирует он сам для себя и в
+дальнейшем будет в ней проживать в указанные даты);
+● reserved_at - дата бронирования(дата в формате YYYY-MM-DD HH24:MI:SS)
 
+Поля таблицы Persons:
+● id - идентификатор пользователя(уникальное значение);
+● first_name - имя пользователя(строка);
+● last_name - фамилия пользователя(строка)
 
-Алгоритм:
-1). Достаю все комнаты, имеющие менее двух бронирований в прошлом году (NOT IN reserved_at >= ...)
-2). Достаю все брони по этим "непопулярным" комнатам (unpopular_reservations)
-3). Нахожу последние брони по каждой комнате (INNER JOIN max_date)
-4). Цепляю имена юзеров (INNER JOIN persons)
+Ключевой момент: таблица Reservations может содержать записи, в которых одна и та же
+комната забронирована разными пользователями, с пересечением/совпадением
+интервалов, определяемых датами check_in_date и check_out_date. Потому что в отеле
+кроме обычных комнат, есть еще и многоместные(как в хостеле).
 
+Написать SQL-запрос, который выберет для комнат, имеющих менее двух бронирований за последний год, 
+номер комнаты, имя и фамилию пользователя, который проживал(или все еще проживает) в ней последним
+(если последнее заселение в определенную комнату произошло сразу у нескольких человек в один и тот же день, 
+то нужно выбрать всех этих людей. Иначе - только одного человека).
 
-Тестирование:
-
-CREATE TABLE persons (
-    id int,
-    first_name varchar(255),
-    last_name varchar(255)
-);
-
-CREATE TABLE reservations (
-    id int,
-    person_id int,
-    room_number int,
-    check_in_date date,
-    reserved_at datetime
-);
-
-INSERT INTO persons 
-	(id, first_name, last_name) 
-VALUES 
-	(1, "Ivan", "Ivanov"), 
-	(2, "Petr", "Petrov");
-	
-INSERT INTO reservations 
-	(id, person_id, room_number, check_in_date, reserved_at) 
-VALUES 
-	(1, 1, 666, "2020-01-01", "2020-01-01 00:00:00"), 
-	(2, 2, 666, "2023-01-01", "2023-01-01 00:00:00"), 
-	(3, 1, 777, "2023-01-01", "2023-01-01 00:00:00"), 
-	(4, 2, 777, "2023-01-01", "2023-01-01 00:00:00"); 
-
-Результат запроса на тестовых данных:
-+-------------+------------+-----------+
-| room_number | first_name | last_name |
-+-------------+------------+-----------+
-|         666 | Petr       | Petrov    |
-+-------------+------------+-----------+
-
-
-INSERT INTO reservations 
-	(id, person_id, room_number, check_in_date, reserved_at) 
-VALUES 
-	(5, 1, 999, "2020-01-01", "2020-01-01 00:00:00"), 
-	(6, 2, 999, "2020-01-01", "2020-01-01 23:59:59");
-
-Результат запроса на обновленных данных:
-+-------------+------------+-----------+
-| room_number | first_name | last_name |
-+-------------+------------+-----------+
-|         666 | Petr       | Petrov    |
-|         999 | Ivan       | Ivanov    |
-|         999 | Petr       | Petrov    |
-+-------------+------------+-----------+
-
-INSERT INTO reservations 
-	(id, person_id, room_number, check_in_date, reserved_at) 
-VALUES 
-	(7, 1, 333, "2025-01-01", "2023-01-01 00:00:00");
-
-Результат запроса на обновленных данных:
-+-------------+------------+-----------+
-| room_number | first_name | last_name |
-+-------------+------------+-----------+
-|         666 | Petr       | Petrov    |
-|         999 | Ivan       | Ivanov    |
-|         999 | Petr       | Petrov    |
-+-------------+------------+-----------+
-(всё верно - последняя запись не должна попасть в выборку, т.к. бронь на 2025 год, а нам нужны те кто "проживал")
+Уточнения:
+ - дату выселения можно вообще никак не учитывать, последнего проживающего смотрим только по дате его заселения;
+ - нужны те кто “проживал”, а не те кто "будет проживать" - учесть этот нюанс;
+ - последнего проживающего (заселившего) нужно найти среди всех бронирований комнаты (а не только тех, которые были 
+ сделаны в каком-то году). Если последняя бронь комнаты была 5 лет назад, то она может попасть в выборку при 
+ соответствии остальным условиям.
 </pre>
